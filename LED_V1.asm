@@ -45,14 +45,14 @@ WPUB_init  equ 0xFF
 IOCBP_init equ B'00000000'
 IOCBN_init equ B'11001000'
 ROT_init    equ 0x80
-GRUEN_init  equ	0x10
+GRUEN_init  equ	0x01
 BLAU_init   equ 0x80
 CCPTMRS_init equ B'00000000'
 PR2_PWM_init equ 0xFF
 CCP3CON_init equ B'00001100'
 CCP4CON_init equ B'00001100'
 T2CON_init equ B'00000100'
-T4CON_init equ B'00000010' ;Prescaler 16
+T4CON_init equ B'00000001' ;Prescaler 4
 PR4_init equ 0xFF
 INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
@@ -75,6 +75,12 @@ debug_led macro an_aus
 	    bcf  DEBUG_LED
 	endif
 	endm
+
+debug_led_toggle macro
+	banksel  LATA
+	movlw    B'10'
+	xorwf    LATA,f
+	endm
 	    
 
 ;*****************************************
@@ -86,6 +92,7 @@ BLAU	equ	0022
 ENCSTAT equ     0023
 ENC1_AKT equ	0
 ENC1_DIR equ    1
+ENC1_C  equ	2
  ;Bit 0 Encoder 1 aktiv
  ;Bit 1 Encoder 1 Richtung, 0 rechts, 1 links
  
@@ -124,36 +131,106 @@ enc1int ;debug_led 1
 	bsf     T4CON,TMR4ON ;debounce timer
 	movlb   PORT_BANK
 	btfss   ENC1_L
-	goto    enc1links
 	goto    enc1rechts
+	goto    enc1links
 enc1links
-	banksel ROT
+	banksel ENCSTAT
+	bsf     ENCSTAT,ENC1_DIR
+	banksel GRUEN
 	movlw   00
-	xorwf   ROT,w
+	xorwf   GRUEN,w
 	btfsc   STATUS,Z
 	return
-	decf    ROT,f
-	movf    ROT,w
+	decf    GRUEN,f
+	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
-	debug_led 1
+	debug_led_toggle
 	return
 enc1rechts
-	banksel ROT
+	banksel ENCSTAT
+	bcf     ENCSTAT,ENC1_DIR
+	banksel GRUEN
 	movlw   0xFF
-	xorwf   ROT,w
+	xorwf   GRUEN,w
 	btfsc   STATUS,Z
 	return
-	incf    ROT,f
-	movf    ROT,w
+	incf    GRUEN,f
+	movf    GRUEN,w
 	banksel CCPR4L
-	movwf   CCPR4L	
-	debug_led 0
+	movwf   CCPR4L
+	;debug_led 0
 	return
 	
 bounce_1
+	banksel ENCSTAT
+	btfsc   ENCSTAT,ENC1_C
+	goto    b1_c
+	banksel T4CON
+	btfss   T4CON,TMR4ON
+	bsf     T4CON,TMR4ON ;debounce timer
+	banksel ENCSTAT
+	btfsc   ENCSTAT,ENC1_DIR
+	goto    b1_links
+	goto    b1_rechts
+b1_links   ;links = 1
+	movlb   PORT_BANK
+	btfsc   ENC1_L
+	return
+	banksel ENCSTAT
+	bsf     ENCSTAT,ENC1_C   ;different state
+	return
+	
+b1_rechts   ;links = 0
+	movlb   PORT_BANK
+	btfss   ENC1_L
+	return
+	goto    start_t4 ;different state
+	
+b1_c    movlb   PORT_BANK
+	btfsc   ENC1_L
+	goto    b1_c_r
+b1_c_l  
+	banksel ENCSTAT
+	btfsc   ENCSTAT,ENC1_DIR  
+	goto    b1_next_l
 	banksel TMR4
 	clrf    TMR4
+	return
+	
+b1_c_r  
+	banksel ENCSTAT
+	btfss   ENCSTAT,ENC1_DIR  
+	goto    b1_next_r
+	banksel TMR4
+	clrf    TMR4
+	return
+
+b1_next_l 
+	banksel T4CON
+	bcf     T4CON,TMR4ON
+	banksel TMR4
+	clrf    TMR4
+	banksel ENCSTAT
+	bsf     ENCSTAT,ENC1_AKT
+	bcf     ENCSTAT,ENC1_C
+	goto    enc1links
+	
+b1_next_r
+	banksel T4CON
+	bcf     T4CON,TMR4ON
+	banksel TMR4
+	clrf    TMR4
+	banksel ENCSTAT
+	bsf     ENCSTAT,ENC1_AKT
+	bcf     ENCSTAT,ENC1_C
+	goto    enc1rechts
+
+start_t4 
+	banksel T4CON
+	bsf     T4CON,TMR4ON ;debounce timer
+	;banksel TMR4
+	;clrf    TMR4
 	return
 
 enc2int movlb   PORT_BANK
