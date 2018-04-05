@@ -23,7 +23,14 @@
 ; RB5 SPI clock/NC 
 ; RB6 Encoder 2 rechts
 ; RB7 Encoder 3 rechts
-
+    ENC1 equ 3
+    ENC2 equ 6
+    ENC3 equ 7
+ 
+    PORT_BANK equ 0
+    #define ENC1_L PORTB,RB1 ;Encoder links
+    #define ENC2_L PORTB,RB4
+    #define ENC3_L PORTA,RA5
     #define DEBUG_LED LATA,1
 TRIS_ROT   equ TRISA
 TRIS_GRUEN  equ TRISA
@@ -45,7 +52,10 @@ PR2_PWM_init equ 0xFF
 CCP3CON_init equ B'00001100'
 CCP4CON_init equ B'00001100'
 T2CON_init equ B'00000100'
+T4CON_init equ B'00000000'
+PR4_init equ 0xFF
 INTCON_init equ B'00001000' ;Enable IOC
+PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
 
 
 	 __config _CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _PWRTE_OFF & _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF  & _CLKOUTEN_OFF & _IESO_OFF & _FCMEN_OFF
@@ -76,14 +86,72 @@ BLAU	equ	22
 
 ;*****************************************
 	org	00  ;Programmstart
+	pagesel init
 	goto	init
 	org 	04  ;Interrupt-Vector
+	;debug_led 1
+	btfsc   INTCON,IOCIF ;Pin state change?
+	call    ioc_int
+	banksel PIR3
+	btfsc   PIR3,TMR4IF
+	call    tmr4_int
+	retfie
+ioc_int 
+	;debug_led 1
+	banksel IOCBF ;ioc interrupt
+	btfsc   IOCBF,ENC1
+	call    enc1int
+	btfsc   IOCBF,ENC2
+	call    enc2int
+	btfsc   IOCBF,ENC3
+	call    enc3int
+	bcf     INTCON,IOCIF
+	return
+	
+enc1int ;debug_led 1
+	bcf     IOCBF,ENC1
+	movlb   PORT_BANK
+	btfss   ENC1_L
+	goto    enc1links
+	goto    enc1rechts
+enc1links
+	;debug_led 1
+	return
+enc1rechts
+	;debug_led 0
+	return
 
+enc2int movlb   PORT_BANK
+	btfss   ENC2_L
+	goto    enc2links
+	goto    enc2rechts
+enc2links
+	;debug_led 1
+	return
+enc2rechts
+	;debug_led 0
+	return
+	
+enc3int movlb   PORT_BANK
+	btfss   ENC3_L
+	goto    enc3links
+	goto    enc3rechts
+enc3links
+	;debug_led 1
+	return
+enc3rechts
+	;debug_led 0
+	return
+	
+tmr4int 
+	banksel TMR4
+	clrf    TMR4
+	banksel PIR3
+	bcf     PIR3,TMR4IF ;clear interrupt flag
 
-
-start	
-	;bsf	INTCON,GIE
-	debug_led 1
+start	bsf     INTCON,PEIE
+	bsf	INTCON,GIE
+	;debug_led 1
 loop	goto	loop ; Endlosschleife	
 
 
@@ -126,7 +194,12 @@ init    load_reg OSCCON, OSCCON_init
 	banksel  TRIS_GRUEN
 	bcf	 TRIS_BIT_GRUEN
 	
-	load_reg  INTCON,INTCON_init
+	load_reg INTCON,INTCON_init
+	load_reg T4CON,T4CON_init
+	load_reg PR4,PR4_init
+	load_reg PIE3,PIE3_init
+	
+	pagesel  start
 	goto	 start
 ;*****************************************	
 	end
