@@ -52,7 +52,7 @@ PR2_PWM_init equ 0xFF
 CCP3CON_init equ B'00001100'
 CCP4CON_init equ B'00001100'
 T2CON_init equ B'00000100'
-T4CON_init equ B'00000000'
+T4CON_init equ B'00000010' ;Prescaler 16
 PR4_init equ 0xFF
 INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
@@ -80,9 +80,15 @@ debug_led macro an_aus
 ;*****************************************
 ; Memory
 ; Bank0:
-ROT	equ     20
-GRUEN	equ	21
-BLAU	equ	22
+ROT	equ     0020
+GRUEN	equ	0021
+BLAU	equ	0022
+ENCSTAT equ     0023
+ENC1_AKT equ	0
+ENC1_DIR equ    1
+ ;Bit 0 Encoder 1 aktiv
+ ;Bit 1 Encoder 1 Richtung, 0 rechts, 1 links
+ 
 
 ;*****************************************
 	org	00  ;Programmstart
@@ -110,15 +116,44 @@ ioc_int
 	
 enc1int ;debug_led 1
 	bcf     IOCBF,ENC1
+	banksel ENCSTAT
+	btfsc   ENCSTAT,ENC1_AKT
+	goto    bounce_1 ; encoder 1 bounced
+	bsf     ENCSTAT,ENC1_AKT
+	banksel T4CON
+	bsf     T4CON,TMR4ON ;debounce timer
 	movlb   PORT_BANK
 	btfss   ENC1_L
 	goto    enc1links
 	goto    enc1rechts
 enc1links
-	;debug_led 1
+	banksel ROT
+	movlw   00
+	xorwf   ROT,w
+	btfsc   STATUS,Z
+	return
+	decf    ROT,f
+	movf    ROT,w
+	banksel CCPR4L
+	movwf   CCPR4L
+	debug_led 1
 	return
 enc1rechts
-	;debug_led 0
+	banksel ROT
+	movlw   0xFF
+	xorwf   ROT,w
+	btfsc   STATUS,Z
+	return
+	incf    ROT,f
+	movf    ROT,w
+	banksel CCPR4L
+	movwf   CCPR4L	
+	debug_led 0
+	return
+	
+bounce_1
+	banksel TMR4
+	clrf    TMR4
 	return
 
 enc2int movlb   PORT_BANK
@@ -143,11 +178,16 @@ enc3rechts
 	;debug_led 0
 	return
 	
-tmr4int 
+tmr4_int 
+	banksel T4CON
+	bcf     T4CON,TMR4ON
 	banksel TMR4
 	clrf    TMR4
 	banksel PIR3
 	bcf     PIR3,TMR4IF ;clear interrupt flag
+	banksel ENCSTAT
+	clrf    ENCSTAT ;bounce is over
+	return
 
 start	bsf     INTCON,PEIE
 	bsf	INTCON,GIE
