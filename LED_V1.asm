@@ -143,12 +143,8 @@ enc1rechts
 	
 	banksel GRUEN
 	
-	movlw   00
-	xorwf   GRUEN,w
-	btfsc   STATUS,Z
-	return
-	decf    GRUEN,f
-	
+	movlw   10
+	addwf   GRUEN,w
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
@@ -164,12 +160,8 @@ enc1links
 	
 	banksel GRUEN
 	
-	movlw   0xFF
-	xorwf   GRUEN,w
-	btfsc   STATUS,Z
-	return
-	incf    GRUEN,f
-	
+	movlw   10
+	subwf   GRUEN,f
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
