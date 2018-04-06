@@ -203,19 +203,14 @@ enc2rechts
 	bcf     ENC_EN,R2
 	bcf     ENC_EN,L2
 	
-	banksel VAL
+	banksel SAT
 	movlw   .16
-	addwf   VAL,f
+	addwf   SAT,f
+	movlw   0xFF
 	btfsc   STATUS,C
-	call    v_setmax
-	
-	movf    VAL,w
-	banksel GRUEN
-	movwf   GRUEN
-	movf    GRUEN,w
-	banksel CCPR4L
-	movwf   CCPR4L
-	
+	movwf   SAT
+	goto    timer4start
+	incf    VAL,f
 	goto    timer4start
 	
 enc2links
@@ -225,18 +220,11 @@ enc2links
 	bcf     ENC_EN,R2
 	bcf     ENC_EN,L2
 	
-	banksel VAL
+	banksel SAT
 	movlw   .16
-	subwf   VAL,f
+	subwf   SAT,f
 	btfss   STATUS,C
-	clrf    VAL
-	movf    VAL,w
-	banksel GRUEN
-	movwf   GRUEN
-	movf    GRUEN,w
-	banksel CCPR4L
-	movwf   CCPR4L
-	
+	clrf    SAT 
 	goto    timer4start
 	
 enc3int ;debug_led 1
@@ -253,7 +241,7 @@ enc3rechts
 	bcf     ENC_EN,R3
 	bcf     ENC_EN,L3
 	
-	banksel VAL
+	banksel HUE_LOW
 	movlw   .16
 	addwf   VAL,f
 	btfsc   STATUS,C
