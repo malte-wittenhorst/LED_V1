@@ -53,7 +53,7 @@ CCP3CON_init equ B'00001100'
 CCP4CON_init equ B'00001100'
 T2CON_init equ B'00000100'
 T4CON_init equ B'00000001' ;Prescaler 4
-PR4_init equ 0xFF
+PR4_init equ .64
 INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
 ENC_EN_init equ 0xFF
@@ -139,12 +139,16 @@ enc1rechts
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
+	debug_led_toggle
+	
 	banksel GRUEN
+	
 	movlw   00
 	xorwf   GRUEN,w
 	btfsc   STATUS,Z
 	return
 	decf    GRUEN,f
+	
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
@@ -159,11 +163,13 @@ enc1links
 	bcf     ENC_EN,L1
 	
 	banksel GRUEN
+	
 	movlw   0xFF
 	xorwf   GRUEN,w
 	btfsc   STATUS,Z
 	return
 	incf    GRUEN,f
+	
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
