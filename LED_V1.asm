@@ -128,7 +128,6 @@ RGB_t	equ	0x002E
 	pagesel init
 	goto	init
 	org 	04  ;Interrupt-Vector
-	;debug_led 1
 	btfsc   INTCON,IOCIF ;Pin state change?
 	call    ioc_int
 	banksel PIR3
@@ -146,7 +145,7 @@ get_blau brw
 	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q
 	
 ioc_int 
-	;debug_led 1
+	debug_led 1
 	banksel IOCBF ;ioc interrupt
 	btfsc   IOCBF,ENC1
 	call    enc1int
@@ -157,7 +156,7 @@ ioc_int
 	bcf     INTCON,IOCIF
 	return
 	
-enc1int ;debug_led 1
+enc1int
 	bcf     IOCBF,ENC1
 	movlb   PORT_BANK
 	btfss   ENC1_L
@@ -263,7 +262,7 @@ enc3rechts
 	bcf     ENC_EN,R3
 	bcf     ENC_EN,L3
 	
-	debug_led 1
+	;debug_led 1
 	
 	banksel HUE_LOW
 	movlw   .16
@@ -283,7 +282,7 @@ enc3links
 	bcf     ENC_EN,R3
 	bcf     ENC_EN,L3
 	
-	debug_led 0
+	;debug_led 0
 	
 	banksel HUE_LOW
 	movlw   .16
