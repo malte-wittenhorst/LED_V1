@@ -56,6 +56,7 @@ T4CON_init equ B'00000001' ;Prescaler 4
 PR4_init equ 0xFF
 INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
+ENC_EN_init equ 0xFF
 
 
 	 __config _CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _PWRTE_OFF & _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF  & _CLKOUTEN_OFF & _IESO_OFF & _FCMEN_OFF
@@ -95,6 +96,9 @@ ENC1_DIR equ    1
 ENC1_C  equ	2
  ;Bit 0 Encoder 1 aktiv
  ;Bit 1 Encoder 1 Richtung, 0 rechts, 1 links
+ENC_EN equ      0024 ;Encoder enable
+ R1    equ      0 ;Rechts Encoder 1
+ L1    equ      1 ;Links Encoder 1
  
 
 ;*****************************************
@@ -123,19 +127,18 @@ ioc_int
 	
 enc1int ;debug_led 1
 	bcf     IOCBF,ENC1
-	banksel ENCSTAT
-	btfsc   ENCSTAT,ENC1_AKT
-	goto    bounce_1 ; encoder 1 bounced
-	bsf     ENCSTAT,ENC1_AKT
-	banksel T4CON
-	bsf     T4CON,TMR4ON ;debounce timer
 	movlb   PORT_BANK
 	btfss   ENC1_L
 	goto    enc1rechts
 	goto    enc1links
-enc1links
-	banksel ENCSTAT
-	bsf     ENCSTAT,ENC1_DIR
+
+enc1rechts
+	banksel ENC_EN
+	btfss   ENC_EN,R1
+	goto    timer4start
+	bcf     ENC_EN,R1
+	bcf     ENC_EN,L1
+	
 	banksel GRUEN
 	movlw   00
 	xorwf   GRUEN,w
@@ -145,11 +148,16 @@ enc1links
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
-	debug_led_toggle
-	return
-enc1rechts
-	banksel ENCSTAT
-	bcf     ENCSTAT,ENC1_DIR
+	
+	goto    timer4start
+	
+enc1links
+	banksel ENC_EN
+	btfss   ENC_EN,L1
+	goto    timer4start
+	bcf     ENC_EN,R1
+	bcf     ENC_EN,L1
+	
 	banksel GRUEN
 	movlw   0xFF
 	xorwf   GRUEN,w
@@ -159,78 +167,15 @@ enc1rechts
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
-	;debug_led 0
-	return
 	
-bounce_1
-	banksel ENCSTAT
-	btfsc   ENCSTAT,ENC1_C
-	goto    b1_c
+	goto    timer4start
+	
+timer4start           ;start timer 4
 	banksel T4CON
 	btfss   T4CON,TMR4ON
 	bsf     T4CON,TMR4ON ;debounce timer
-	banksel ENCSTAT
-	btfsc   ENCSTAT,ENC1_DIR
-	goto    b1_links
-	goto    b1_rechts
-b1_links   ;links = 1
-	movlb   PORT_BANK
-	btfsc   ENC1_L
-	return
-	banksel ENCSTAT
-	bsf     ENCSTAT,ENC1_C   ;different state
-	return
-	
-b1_rechts   ;links = 0
-	movlb   PORT_BANK
-	btfss   ENC1_L
-	return
-	goto    start_t4 ;different state
-	
-b1_c    movlb   PORT_BANK
-	btfsc   ENC1_L
-	goto    b1_c_r
-b1_c_l  
-	banksel ENCSTAT
-	btfsc   ENCSTAT,ENC1_DIR  
-	goto    b1_next_l
 	banksel TMR4
 	clrf    TMR4
-	return
-	
-b1_c_r  
-	banksel ENCSTAT
-	btfss   ENCSTAT,ENC1_DIR  
-	goto    b1_next_r
-	banksel TMR4
-	clrf    TMR4
-	return
-
-b1_next_l 
-	banksel T4CON
-	bcf     T4CON,TMR4ON
-	banksel TMR4
-	clrf    TMR4
-	banksel ENCSTAT
-	bsf     ENCSTAT,ENC1_AKT
-	bcf     ENCSTAT,ENC1_C
-	goto    enc1links
-	
-b1_next_r
-	banksel T4CON
-	bcf     T4CON,TMR4ON
-	banksel TMR4
-	clrf    TMR4
-	banksel ENCSTAT
-	bsf     ENCSTAT,ENC1_AKT
-	bcf     ENCSTAT,ENC1_C
-	goto    enc1rechts
-
-start_t4 
-	banksel T4CON
-	bsf     T4CON,TMR4ON ;debounce timer
-	;banksel TMR4
-	;clrf    TMR4
 	return
 
 enc2int movlb   PORT_BANK
@@ -257,13 +202,25 @@ enc3rechts
 	
 tmr4_int 
 	banksel T4CON
-	bcf     T4CON,TMR4ON
+	bcf     T4CON,TMR4ON ;stop timer4
 	banksel TMR4
 	clrf    TMR4
 	banksel PIR3
 	bcf     PIR3,TMR4IF ;clear interrupt flag
-	banksel ENCSTAT
-	clrf    ENCSTAT ;bounce is over
+        
+en_enc1 movlb   PORT_BANK
+	btfss   ENC1_L
+	goto    en_enc1_r
+	goto    en_enc1_l
+	
+en_enc1_r ;Enable right
+	banksel ENC_EN
+	bsf     ENC_EN,R1
+	return
+	
+en_enc1_l ;Enable left
+	banksel ENC_EN
+	bsf     ENC_EN,L1	
 	return
 
 start	bsf     INTCON,PEIE
@@ -287,6 +244,7 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg GRUEN, GRUEN_init
 	load_reg BLAU, BLAU_init
 	load_reg CCPTMRS, CCPTMRS_init
+	load_reg ENC_EN,ENC_EN_init
 	    
 	
 	banksel  TRIS_ROT
