@@ -6,6 +6,11 @@
 ; Encoder 2  (Mitte) steuert Saturation
 ; Encoder 3  (Rechts) steuert Hue
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
+test_p0 set 0
+test_p1 set 0
+test_p2 set 0
+debug_0 set 1
+    
     #include <P16F1827.inc>
     list p = 16f1827
     processor 16f1827
@@ -59,6 +64,7 @@ CCP2CON_init equ B'00001100'
 CCP3CON_init equ B'00001100'
 CCP4CON_init equ B'00001100'
 PSTR2CON_init equ B'00000001'
+APFCON0_init equ B'00001000'
 T2CON_init equ B'00000100'
 T4CON_init equ B'00000001' ;Prescaler 4
 PR4_init equ .64
@@ -192,7 +198,7 @@ enc1rechts
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
-	debug_led 1
+	;debug_led 1
 	
 	banksel VAL
 	movlw   VAL_INC
@@ -215,7 +221,7 @@ enc1links
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
-	debug_led 0
+	;debug_led 0
 	
 	banksel VAL
 	movlw   VAL_DEC
@@ -364,7 +370,7 @@ timer4start           ;start timer 4
 	clrf    TMR4
 	return
 
-tmr4_int 
+tmr4_int
 	banksel T4CON
 	bcf     T4CON,TMR4ON ;stop timer4
 	banksel TMR4
@@ -441,6 +447,16 @@ compute_rgb
 	banksel RGB_p
 	movwf   RGB_p
 	
+	if test_p0
+	pagesel wei0
+	comf    RGB_p,f
+	comf    RGB_p,f
+	btfss   STATUS,Z
+	goto    wei0
+	debug_led 1
+wei0    nop
+	endif
+	
 	movf    SAT,w   ;q = V*(1-S*f)
 	movwf   AARGB0
 	movf    HUE_LOW,w ; HUE_LOW ist f
@@ -480,6 +496,16 @@ compute_rgb
 	rlf     AARGB1,w
 	movwf   RGB_t
 	
+	if test_p2
+	pagesel wei2
+	comf    RGB_t,f
+	comf    RGB_t,f
+	btfss   STATUS,Z
+	goto    wei2
+	debug_led 1
+wei2    nop
+	endif
+	
 	pagesel get_rot
 	movf    HUE_HIGH,w
 	call    get_rot
@@ -507,6 +533,16 @@ compute_rgb
 	movf    INDF0,w
 	movwf   BLAU
 	
+	if test_p1
+	pagesel wei1
+	comf    BLAU,f
+	comf    BLAU,f
+	btfss   STATUS,Z
+	goto    wei1
+	debug_led 1
+wei1    nop
+	endif
+	
 	movf    ROT,w
 	banksel CCPR3L
 	movwf   CCPR3L
@@ -515,9 +551,15 @@ compute_rgb
 	banksel CCPR4L
 	movwf   CCPR4L
 	
+if debug_0
+	movlw   05
+	banksel CCPR2L
+	movwf   CCPR2L
+else
 	movf    BLAU,w
 	banksel CCPR2L
 	movwf   CCPR2L
+endif
 	
 	return
 	
@@ -587,6 +629,7 @@ init    load_reg OSCCON, OSCCON_init
 	banksel  TRIS_BLAU
 	bsf	 TRIS_BIT_BLAU
 	load_reg PSTR2CON,PSTR2CON_init
+	load_reg APFCON0,APFCON0_init
 	load_reg CCP2CON, CCP2CON_init
 	banksel  BLAU
    	movf	 BLAU,w
