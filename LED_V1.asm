@@ -192,7 +192,7 @@ enc1rechts
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
-	;debug_led_toggle
+	debug_led 1
 	
 	banksel VAL
 	movlw   VAL_INC
@@ -215,7 +215,7 @@ enc1links
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
-	debug_led 1
+	debug_led 0
 	
 	banksel VAL
 	movlw   VAL_DEC
