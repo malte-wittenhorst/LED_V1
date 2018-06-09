@@ -2,6 +2,10 @@
 ; LED-Steuerung
 ; PIC 16F1827
 ; Malte Wittenhorst
+; Encoder 1  (Links) steuert Value
+; Encoder 2  (Mitte) steuert Saturation
+; Encoder 3  (Rechts) steuert Hue
+; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
     #include <P16F1827.inc>
     list p = 16f1827
     processor 16f1827
@@ -23,11 +27,11 @@
 ; RB5 SPI clock/NC 
 ; RB6 Encoder 2 rechts
 ; RB7 Encoder 3 rechts
-    ENC1 equ 3
-    ENC2 equ 6
-    ENC3 equ 7
+ENC1 equ 3
+ENC2 equ 6
+ENC3 equ 7
  
-    PORT_BANK equ 0
+PORT_BANK equ 0
     #define ENC1_L PORTB,RB1 ;Encoder links
     #define ENC2_L PORTB,RB4
     #define ENC3_L PORTA,RA5
@@ -50,14 +54,14 @@ ROT_init    equ 0x80
 GRUEN_init  equ	0x00
 BLAU_init   equ 0x40
 CCPTMRS_init equ B'00000000'
-PR2_PWM_init equ 0xFF
+PR2_PWM_init equ .128         ; Timer 2 ist PWM-Timer
 CCP2CON_init equ B'00001100'
 CCP3CON_init equ B'00001100'
 CCP4CON_init equ B'00001100'
 PSTR2CON_init equ B'00000001'
 T2CON_init equ B'00000100'
 T4CON_init equ B'00000001' ;Prescaler 4
-PR4_init equ .128
+PR4_init equ .64
 INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
 ENC_EN_init equ 0xFF
@@ -163,7 +167,7 @@ get_blau brw
 	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q
 	
 ioc_int 
-	debug_led 1
+	;debug_led 1
 	banksel IOCBF ;ioc interrupt
 	btfsc   IOCBF,ENC1
 	call    enc1int
@@ -188,7 +192,7 @@ enc1rechts
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
-	debug_led_toggle
+	;debug_led_toggle
 	
 	banksel VAL
 	movlw   VAL_INC
@@ -211,7 +215,7 @@ enc1links
 	bcf     ENC_EN,R1
 	bcf     ENC_EN,L1
 	
-	debug_led 0
+	debug_led 1
 	
 	banksel VAL
 	movlw   VAL_DEC
@@ -298,9 +302,9 @@ enc3rechts
 	;debug_led 1
 	
 	banksel HUE_LOW
-	movlw   HUE_INC
-	addwf   HUE_LOW
-	movf    SAT,w
+	movlw   HUE_LOW_INC
+	addwf   HUE_LOW,f
+	movf    HUE_LOW,w
 	sublw   HUE_LOW_MAX
 	btfss   STATUS,C    ; wenn C = 1, dann kein Übertrag
 	call    inc_hue
@@ -424,7 +428,7 @@ compute_rgb
 	banksel SAT
 	movf    SAT,w
 	banksel AARGB0
-	subwf   AARB0,f
+	subwf   AARGB0,f
 	
 	banksel VAL
 	movf    VAL,w
@@ -432,7 +436,7 @@ compute_rgb
 	movwf   BARGB0
 	call    FXM0808U
 	banksel AARGB1
-	rlf     AARGBO,f
+	rlf     AARGB0,f
 	rlf     AARGB1,w ; Shift am Ende der Multiplikation
 	banksel RGB_p
 	movwf   RGB_p
@@ -595,11 +599,6 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg T4CON,T4CON_init
 	load_reg PR4,PR4_init
 	load_reg PIE3,PIE3_init
-	
-	load_reg HUE_LOW,0
-	load_reg HUE_HIGH,0
-	load_reg VAL,0
-	load_reg SAT,0
 	
 	pagesel  start
 	goto	 start
