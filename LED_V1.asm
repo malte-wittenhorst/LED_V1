@@ -57,14 +57,14 @@ CCP4CON_init equ B'00001100'
 PSTR2CON_init equ B'00000001'
 T2CON_init equ B'00000100'
 T4CON_init equ B'00000001' ;Prescaler 4
-PR4_init equ .64
+PR4_init equ .128
 INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
 ENC_EN_init equ 0xFF
 HUE_LOW_init equ 00
 HUE_HIGH_init equ 00
-VAL_init equ .255
-SAT_init equ .255
+VAL_init equ .128
+SAT_init equ .128
 
 ;**********************************************************
 HUE_LOW_MIN equ 0x00
@@ -81,6 +81,7 @@ SAT_MIN equ 0x00
 SAT_MAX equ 0x80
 SAT_INC equ 0x08
 SAT_DEC equ 0x08
+ONE_EQ  equ .128
 
 ;**********************************************************
 
@@ -243,11 +244,14 @@ enc2rechts
 	bcf     ENC_EN,L2
 	
 	banksel SAT
-	movlw   .16
+	movlw   SAT_INC
 	addwf   SAT,f
-	movlw   0xFF
-	btfsc   STATUS,C
-	movwf   SAT
+	movf    SAT,w
+	sublw   SAT_MAX
+	movlw   SAT_MAX ; SAT_MAX vorsichtshalber in w
+	btfss   STATUS,C ; Wenn carry bit 0, dann W > k, also Val größer val_max
+	movwf   SAT      ; wird übersprungen, wenn carry bit 1 ist
+	
 	
 	pagesel compute_rgb
 	call    compute_rgb
@@ -262,10 +266,15 @@ enc2links
 	bcf     ENC_EN,L2
 	
 	banksel SAT
-	movlw   .16
+	movlw   SAT_DEC
 	subwf   SAT,f
-	btfss   STATUS,C
+	btfss   STATUS,C ; val_dec muss kleiner als VAL sein
 	clrf    SAT
+	movf    SAT,w
+	sublw   SAT_MIN
+	movlw   SAT_MIN
+	btfsc   STATUS,C
+	movwf   SAT       ; Carry ist eins, also val kleiner gleich val_min
 	
 	pagesel compute_rgb
 	call    compute_rgb	
@@ -289,9 +298,11 @@ enc3rechts
 	;debug_led 1
 	
 	banksel HUE_LOW
-	movlw   .16
-	addwf   HUE_LOW,f
-	btfsc   STATUS,C
+	movlw   HUE_INC
+	addwf   HUE_LOW
+	movf    SAT,w
+	sublw   HUE_LOW_MAX
+	btfss   STATUS,C    ; wenn C = 1, dann kein Übertrag
 	call    inc_hue
 	
 	pagesel compute_rgb
@@ -309,7 +320,7 @@ enc3links
 	;debug_led 0
 	
 	banksel HUE_LOW
-	movlw   .16
+	movlw   HUE_LOW_DEC
 	subwf   HUE_LOW,f
 	btfss   STATUS,C
 	call    dec_hue
@@ -320,6 +331,7 @@ enc3links
 	goto    timer4start
 	
 inc_hue 
+	clrf    HUE_LOW
 	banksel HUE_HIGH
 	incf    HUE_HIGH,f
 	movf    HUE_HIGH,w
@@ -329,6 +341,8 @@ inc_hue
 	return
 
 dec_hue
+	movlw   HUE_LOW_MAX
+	movwf   HUE_LOW
 	banksel HUE_HIGH
 	decf    HUE_HIGH,f
 	comf    HUE_HIGH,w
@@ -404,41 +418,62 @@ en_enc3_l ;Enable left
 	return
 
 compute_rgb
+	movlw   SAT_MAX ; p= V*(1-S)
 	banksel AARGB0
-	comf	SAT,w
 	movwf   AARGB0
-	incf    AARGB0,f
+	banksel SAT
+	movf    SAT,w
+	banksel AARGB0
+	subwf   AARB0,f
+	
+	banksel VAL
+	movf    VAL,w
+	banksel BARGB0
+	movwf   BARGB0
+	call    FXM0808U
+	banksel AARGB1
+	rlf     AARGBO,f
+	rlf     AARGB1,w ; Shift am Ende der Multiplikation
+	banksel RGB_p
+	movwf   RGB_p
+	
+	movf    SAT,w   ;q = V*(1-S*f)
+	movwf   AARGB0
+	movf    HUE_LOW,w ; HUE_LOW ist f
+	movwf   BARGB0
+	call    FXM0808U
+	rlf     AARGB0,f
+	rlf     AARGB1,f
+	movlw   ONE_EQ
+	movwf   AARGB0
+	movf    AARGB1,w
+	subwf   AARGB0,f  ; 1-S*f
+	
 	movf    VAL,w
 	movwf   BARGB0
 	call    FXM0808U
-	movf    AARGB1,w
-	movwf   RGB_p
-	movf    SAT,w
+	rlf     AARGB0,f
+	rlf     AARGB1,w ; Shift am Ende der Multiplikation
+	movwf   RGB_q
+	
+	movlw   HUE_LOW_MAX    ;t = V*(1-S*(1-f))
 	movwf   AARGB0
 	movf    HUE_LOW,w
+	subwf   AARGB0,f  ; 1-f ist geladen
+	movf    SAT,w     ; SAT laden
 	movwf   BARGB0
 	call    FXM0808U
-	comf    AARGB1,w
+	rlf     AARGB0,f
+	rlf     AARGB1,f
+	movlw   ONE_EQ
 	movwf   AARGB0
-	incf    AARGB0,f
-	movf    VAL,w
-	movwf   BARGB0
-	call    FXM0808U
 	movf    AARGB1,w
-	movwf   RGB_q
-	comf    HUE_LOW,w
-	movwf   AARGB0
-	incf    AARGB0,f
-	movf    SAT,w
+	subwf   AARGB0,f ; (1-S*(1-f)) ist geladen
+	movf    VAL,w    ; VAL laden
 	movwf   BARGB0
 	call    FXM0808U
-	comf    AARGB1,w
-	movwf   AARGB0
-	incf    AARGB0,f
-	movf    VAL,w
-	movwf   BARGB0
-	call    FXM0808U
-	movf    AARGB1,w
+	rlf     AARGB0,f
+	rlf     AARGB1,w
 	movwf   RGB_t
 	
 	pagesel get_rot
