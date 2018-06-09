@@ -66,6 +66,24 @@ HUE_HIGH_init equ 00
 VAL_init equ .255
 SAT_init equ .255
 
+;**********************************************************
+HUE_LOW_MIN equ 0x00
+HUE_LOW_MAX equ 0x7F
+HUE_LOW_INC equ 0x08
+HUE_LOW_DEC equ 0x08
+HUE_HIGH_MIN equ 0x00
+HUE_HIGH_MAX equ 0x05
+VAL_MIN equ 0x00
+VAL_MAX equ 0x80
+VAL_INC equ 0x08
+VAL_DEC equ 0x08
+SAT_MIN equ 0x00
+SAT_MAX equ 0x80
+SAT_INC equ 0x08
+SAT_DEC equ 0x08
+
+;**********************************************************
+
 
 	 __config _CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _PWRTE_OFF & _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF  & _CLKOUTEN_OFF & _IESO_OFF & _FCMEN_OFF
 	 __config _CONFIG2, _WRT_OFF & _PLLEN_OFF & _STVREN_ON & _BORV_HI & _LVP_OFF
@@ -90,7 +108,6 @@ debug_led_toggle macro
 	movlw    B'10'
 	xorwf    LATA,f
 	endm
-	    
 
 ;*****************************************
 ; Memory
@@ -173,11 +190,13 @@ enc1rechts
 	debug_led_toggle
 	
 	banksel VAL
-	movlw   .16
+	movlw   VAL_INC
 	addwf   VAL,f
-	movlw   0xFF
-	btfsc   STATUS,C
-	movwf   VAL
+	movf    VAL,w
+	sublw   VAL_MAX
+	movlw   VAL_MAX ; VAL_MAX vorsichtshalber in w
+	btfss   STATUS,C ; Wenn carry bit 0, dann W > k, also Val größer val_max
+	movwf   VAL      ; wird übersprungen, wenn carry bit 1 ist
 	
 	pagesel compute_rgb
 	call	compute_rgb
@@ -194,10 +213,15 @@ enc1links
 	debug_led 0
 	
 	banksel VAL
-	movlw   .16
+	movlw   VAL_DEC
 	subwf   VAL,f
-	btfss   STATUS,C
+	btfss   STATUS,C ; val_dec muss kleiner als VAL sein
 	clrf    VAL
+	movf    VAL,w
+	sublw   VAL_MIN
+	movlw   VAL_MIN
+	btfsc   STATUS,C
+	movwf   VAL       ; Carry ist eins, also val kleiner gleich val_min
 
 	pagesel compute_rgb
 	call    compute_rgb
@@ -298,9 +322,9 @@ enc3links
 inc_hue 
 	banksel HUE_HIGH
 	incf    HUE_HIGH,f
-	movlw   .6
-	xorwf   HUE_HIGH,w
-	btfsc   STATUS,Z
+	movf    HUE_HIGH,w
+	sublw   HUE_HIGH_MAX ; c=0 wenn max kleiner als hue_high
+	btfss   STATUS,C
 	clrf    HUE_HIGH
 	return
 
@@ -310,7 +334,7 @@ dec_hue
 	comf    HUE_HIGH,w
 	btfss   STATUS,Z
 	return
-	movlw   .5
+	movlw   HUE_HIGH_MAX
 	movwf   HUE_HIGH
 	return
 	
