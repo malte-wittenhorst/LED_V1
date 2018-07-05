@@ -8,6 +8,7 @@
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
 
 global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
+extern ioc_int, tmr4_int, ENC_STATUS, ENC_STATUS_init
 
 test_p0 set 0
 test_p1 set 0
@@ -35,9 +36,6 @@ debug_0 set 1
 ; RB5 SPI clock/NC 
 ; RB6 Encoder 2 rechts
 ; RB7 Encoder 3 rechts
-ENC1 equ 3
-ENC2 equ 6
-ENC3 equ 7
  
 PORT_BANK equ 0
     #define ENC1_L PORTB,RB1 ;Encoder links
@@ -125,33 +123,20 @@ debug_led_toggle macro
 
 ;*****************************************
 ; Memory
-; Bank0:
-ROT	equ     0x0020
-GRUEN	equ	0x0021
-BLAU	equ	0x0022
-ENCSTAT equ     0x0023
-ENC1_AKT equ	0
-ENC1_DIR equ    1
-ENC1_C  equ	2
- ;Bit 0 Encoder 1 aktiv
- ;Bit 1 Encoder 1 Richtung, 0 rechts, 1 links
-ENC_EN equ      0x0024 ;Encoder enable
- R1    equ      0 ;Rechts Encoder 1
- L1    equ      1 ;Links Encoder 1
- R2    equ	2
- L2    equ      3
- R3    equ      4
- L3    equ      5
-HUE_LOW equ	0x0025
-HUE_HIGH equ    0x0026
-SAT	equ	0x0027
-VAL	equ	0x0028
-AARGB0  equ	0x0029
-AARGB1  equ	0x002A
-BARGB0	equ     0x002B
-RGB_p	equ	0x002C
-RGB_q	equ	0x002D
-RGB_t	equ	0x002E
+LED	udata   0x0020
+ROT	res     1
+GRUEN	res     1
+BLAU	res     1
+HUE_LOW res     1
+HUE_HIGH res     1
+SAT	res     1
+VAL	res     1
+AARGB0  res     1
+AARGB1  res     1
+BARGB0	res     1
+RGB_p	res     1
+RGB_q	res     1
+RGB_t	res     1
  
 
 ;*****************************************
@@ -175,20 +160,8 @@ get_gruen brw
 get_blau brw
 	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q
 	
-enc1int
-	bcf     IOCBF,ENC1
-	movlb   PORT_BANK
-	btfss   ENC1_L
-	goto    enc1rechts
-	goto    enc1links
 
-enc1rechts
-	banksel ENC_EN
-	btfss   ENC_EN,R1
-	goto    timer4start
-	bcf     ENC_EN,R1
-	bcf     ENC_EN,L1
-	
+enc1_right
 	;debug_led 1
 	
 	banksel VAL
@@ -202,16 +175,9 @@ enc1rechts
 	
 	pagesel compute_rgb
 	call	compute_rgb
+	return
 	
-	goto    timer4start
-	
-enc1links
-	banksel ENC_EN
-	btfss   ENC_EN,L1
-	goto    timer4start
-	bcf     ENC_EN,R1
-	bcf     ENC_EN,L1
-	
+enc1_left
 	;debug_led 0
 	
 	banksel VAL
@@ -227,23 +193,10 @@ enc1links
 
 	pagesel compute_rgb
 	call    compute_rgb
-	
-	goto    timer4start
-	
-enc2int ;debug_led 1
-	bcf     IOCBF,ENC2
-	movlb   PORT_BANK
-	btfss   ENC2_L
-	goto    enc2rechts
-	goto    enc2links
+	return
 
-enc2rechts
-	banksel ENC_EN
-	btfss   ENC_EN,R2
-	goto    timer4start
-	bcf     ENC_EN,R2
-	bcf     ENC_EN,L2
-	
+
+enc2_right
 	banksel SAT
 	movlw   SAT_INC
 	addwf   SAT,f
@@ -256,16 +209,9 @@ enc2rechts
 	
 	pagesel compute_rgb
 	call    compute_rgb
+	return
 	
-	goto    timer4start
-	
-enc2links
-	banksel ENC_EN
-	btfss   ENC_EN,L2
-	goto    timer4start
-	bcf     ENC_EN,R2
-	bcf     ENC_EN,L2
-	
+enc2_left
 	banksel SAT
 	movlw   SAT_DEC
 	subwf   SAT,f
@@ -279,25 +225,9 @@ enc2links
 	
 	pagesel compute_rgb
 	call    compute_rgb	
-	
-	goto    timer4start
-	
-enc3int ;debug_led 1
-	bcf     IOCBF,ENC3
-	movlb   PORT_BANK
-	btfss   ENC3_L
-	goto    enc3rechts
-	goto    enc3links
+	return
 
-enc3rechts
-	banksel ENC_EN
-	btfss   ENC_EN,R3
-	goto    timer4start
-	bcf     ENC_EN,R3
-	bcf     ENC_EN,L3
-	
-	;debug_led 1
-	
+enc3_right
 	banksel HUE_LOW
 	movlw   HUE_LOW_INC
 	addwf   HUE_LOW,f
@@ -311,15 +241,7 @@ enc3rechts
 	
 	goto    timer4start
 	
-enc3links
-	banksel ENC_EN
-	btfss   ENC_EN,L3
-	goto    timer4start
-	bcf     ENC_EN,R3
-	bcf     ENC_EN,L3
-	
-	;debug_led 0
-	
+enc3_left
 	banksel HUE_LOW
 	movlw   HUE_LOW_DEC
 	subwf   HUE_LOW,f
@@ -351,71 +273,6 @@ dec_hue
 	return
 	movlw   HUE_HIGH_MAX
 	movwf   HUE_HIGH
-	return
-	
-timer4start           ;start timer 4
-	banksel T4CON
-	btfss   T4CON,TMR4ON
-	bsf     T4CON,TMR4ON ;debounce timer
-	banksel TMR4
-	clrf    TMR4
-	return
-
-tmr4_int
-	banksel T4CON
-	bcf     T4CON,TMR4ON ;stop timer4
-	banksel TMR4
-	clrf    TMR4
-	banksel PIR3
-	bcf     PIR3,TMR4IF ;clear interrupt flag
-	call    en_enc1
-	call    en_enc2
-	call    en_enc3
-	return
-        
-en_enc1 movlb   PORT_BANK
-	btfss   ENC1_L
-	goto    en_enc1_r
-	goto    en_enc1_l
-	
-en_enc1_r ;Enable right
-	banksel ENC_EN
-	bsf     ENC_EN,R1
-	return
-	
-en_enc1_l ;Enable left
-	banksel ENC_EN
-	bsf     ENC_EN,L1	
-	return
-
-en_enc2 movlb   PORT_BANK
-	btfss   ENC2_L
-	goto    en_enc2_r
-	goto    en_enc2_l
-	
-en_enc2_r ;Enable right
-	banksel ENC_EN
-	bsf     ENC_EN,R2
-	return
-	
-en_enc2_l ;Enable left
-	banksel ENC_EN
-	bsf     ENC_EN,L2	
-	return
-	
-en_enc3 movlb   PORT_BANK
-	btfss   ENC3_L
-	goto    en_enc3_r
-	goto    en_enc3_l
-	
-en_enc3_r ;Enable right
-	banksel ENC_EN
-	bsf     ENC_EN,R3
-	return
-	
-en_enc3_l ;Enable left
-	banksel ENC_EN
-	bsf     ENC_EN,L3	
 	return
 
 compute_rgb
@@ -582,7 +439,7 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg SAT,SAT_init
 	call	compute_rgb ;init rgb
 	load_reg CCPTMRS, CCPTMRS_init
-	load_reg ENC_EN,ENC_EN_init
+	load_reg ENC_STATUS,ENC_STATUS_init
 	    
 	
 	banksel  TRIS_ROT
