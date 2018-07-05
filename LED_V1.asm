@@ -6,6 +6,9 @@
 ; Encoder 2  (Mitte) steuert Saturation
 ; Encoder 3  (Rechts) steuert Hue
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
+
+global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
+
 test_p0 set 0
 test_p1 set 0
 test_p2 set 0
@@ -171,18 +174,6 @@ get_gruen brw
 
 get_blau brw
 	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q
-	
-ioc_int 
-	;debug_led 1
-	banksel IOCBF ;ioc interrupt
-	btfsc   IOCBF,ENC1
-	call    enc1int
-	btfsc   IOCBF,ENC2
-	call    enc2int
-	btfsc   IOCBF,ENC3
-	call    enc3int
-	bcf     INTCON,IOCIF
-	return
 	
 enc1int
 	bcf     IOCBF,ENC1
