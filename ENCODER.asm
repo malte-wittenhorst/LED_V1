@@ -36,14 +36,4 @@ enc_push macro num_enc  ; ENC bank is already selected
 	btfss ENC#v(num_enc)_R      ; check direction
 	goto  enc#v(num_enc)_left 
 	goto  enc#v(num_enc)_right  
-	endm	
-
-enc_left macro
-
-	retfie
-	endm
-
-enc_right macro
-
-	retfie
 	endm
