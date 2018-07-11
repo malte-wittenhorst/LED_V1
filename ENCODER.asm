@@ -4,6 +4,8 @@
 global ioc_int, tmr4_int, ENC_STATUS, ENC_STATUS_init
 extern enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
 
+variable i ; counter
+
 ENC1_R_PORT equ PORTB
 ENC2_R_PORT equ PORTB
 ENC3_R_PORT equ PORTB
@@ -78,17 +80,12 @@ ioc_int         		; INTCON is Core
 	call    enc3_int
 	return
 
-enc1_int enc_int 1
-
-enc2_int enc_int 2
-
-enc3_int enc_int 3
-
-enc1_push enc_push 1
-
-enc2_push enc_push 2
-
-enc3_push enc_push 3
+i = 0
+while i<3
+i += 1
+enc#v(i)_int enc_int i
+enc#v(i)_push enc_push i
+endw
 
 debounce_timer_start ;start timer 4
 	banksel TMR4
