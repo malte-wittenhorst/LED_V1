@@ -54,7 +54,7 @@ OPTION_REG_init equ B'00001000'
 TRISA_init equ B'00100000'
 TRISB_init equ B'11011111'
 WPUB_init  equ 0xFF
-IOCBP_init equ B'00000000'
+IOCBP_init equ B'11001000' ; both edges activated
 IOCBN_init equ B'11001000'
 ROT_init    equ 0x80
 GRUEN_init  equ	0x00
@@ -140,10 +140,10 @@ RGB_t	res     1
  
 
 ;*****************************************
-	org	00  ;Programmstart
+	code	00  ;Programmstart
 	pagesel init
 	goto	init
-	org 	04  ;Interrupt-Vector
+	code 	04  ;Interrupt-Vector
 	btfsc   INTCON,IOCIF ;Pin state change?
 	call    ioc_int
 	banksel PIR3
