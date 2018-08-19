@@ -8,7 +8,7 @@
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
 
     global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
-    extern ioc_int, tmr4_int, ENC_STATUS, ENC_STATUS_init
+    extern ioc_int, tmr4_int, ENC_STATUS
 
 test_p0 set 0
 test_p1 set 0
@@ -76,6 +76,8 @@ HUE_LOW_init equ 00
 HUE_HIGH_init equ 00
 VAL_init equ .128
 SAT_init equ .128
+ 
+ENC_STATUS_init equ 0
 
 ;**********************************************************
 HUE_LOW_MIN equ 0x00
@@ -140,10 +142,11 @@ RGB_t	res     1
  
 
 ;*****************************************
-	code	00  ;Programmstart
+reset_vec code	00  ;Programmstart
 	pagesel init
 	goto	init
-	code 	04  ;Interrupt-Vector
+	
+int	code 	04  ;Interrupt-Vector
 	btfsc   INTCON,IOCIF ;Pin state change?
 	call    ioc_int
 	banksel PIR3

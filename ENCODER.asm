@@ -40,8 +40,6 @@ P2 equ 1
 P3 equ 2
 T_ON equ 3
 
-ENC_STATUS_init equ 0
-
 enc_int	macro num_enc ; num_enc specifies encoder
 	banksel IOCBF
 	bcf     IOCBF, ENC#v(num_enc)_BF    ;clear flag
