@@ -7,8 +7,8 @@
 ; Encoder 3  (Rechts) steuert Hue
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
 
-global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
-extern ioc_int, tmr4_int, ENC_STATUS, ENC_STATUS_init
+    global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
+    extern ioc_int, tmr4_int, ENC_STATUS, ENC_STATUS_init
 
 test_p0 set 0
 test_p1 set 0
@@ -238,8 +238,7 @@ enc3_right
 	
 	pagesel compute_rgb
 	call    compute_rgb	
-	
-	goto    timer4start
+	return
 	
 enc3_left
 	banksel HUE_LOW
@@ -250,8 +249,7 @@ enc3_left
 
 	pagesel compute_rgb
 	call    compute_rgb
-	
-	goto    timer4start
+	return
 	
 inc_hue 
 	clrf    HUE_LOW
@@ -399,15 +397,15 @@ wei1    nop
 	banksel CCPR4L
 	movwf   CCPR4L
 	
-if debug_0
+    if debug_0
 	movlw   05
 	banksel CCPR2L
 	movwf   CCPR2L
-else
+    else
 	movf    BLAU,w
 	banksel CCPR2L
 	movwf   CCPR2L
-endif
+    endif
 	
 	return
 	
