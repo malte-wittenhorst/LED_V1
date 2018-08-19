@@ -154,18 +154,21 @@ int	code 	04  ;Interrupt-Vector
 	call    tmr4_int
 	retfie
 	
-get_rot brw
-	dt	VAL,RGB_q,RGB_p,RGB_p,RGB_t,VAL
+get_rot andlw  0x07
+	brw
+	dt	VAL,RGB_q,RGB_p,RGB_p,RGB_t,VAL,0,0
 
-get_gruen brw
-	dt	RGB_t,VAL,VAL,RGB_q,RGB_p,RGB_p
+get_gruen andlw  0x07 
+	brw
+	dt	RGB_t,VAL,VAL,RGB_q,RGB_p,RGB_p,0,0
 
-get_blau brw
-	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q
+get_blau andlw  0x07
+	brw
+	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q,0,0
 	
 
 enc1_right
-	;debug_led 1
+	debug_led 1
 	
 	banksel VAL
 	movlw   VAL_INC
@@ -181,7 +184,7 @@ enc1_right
 	return
 	
 enc1_left
-	;debug_led 0
+	debug_led 0
 	
 	banksel VAL
 	movlw   VAL_DEC
@@ -231,6 +234,7 @@ enc2_left
 	return
 
 enc3_right
+	;debug_led 1
 	banksel HUE_LOW
 	movlw   HUE_LOW_INC
 	addwf   HUE_LOW,f
@@ -244,6 +248,7 @@ enc3_right
 	return
 	
 enc3_left
+	;debug_led 0
 	banksel HUE_LOW
 	movlw   HUE_LOW_DEC
 	subwf   HUE_LOW,f
@@ -358,7 +363,7 @@ wei2    nop
 	pagesel get_rot
 	movf    HUE_HIGH,w
 	call    get_rot
-	movwf   FSR0L
+	movwf   FSR0L	
 	movlw   high RGB_p
 	movwf   FSR0H
 	movf    INDF0,w
@@ -416,7 +421,6 @@ wei1    nop
 	
 start	bsf     INTCON,PEIE
 	bsf	INTCON,GIE
-	;debug_led 1
 loop	goto	loop ; Endlosschleife	
 
 
@@ -438,7 +442,10 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg HUE_HIGH,HUE_HIGH_init
 	load_reg VAL,VAL_init
 	load_reg SAT,SAT_init
+	
 	call	compute_rgb ;init rgb
+	
+	;debug_led 1
 	load_reg CCPTMRS, CCPTMRS_init
 	load_reg ENC_STATUS,ENC_STATUS_init
 	    

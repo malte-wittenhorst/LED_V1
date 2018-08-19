@@ -31,6 +31,21 @@ ENC3_L_PORT equ PORTA
     constant ENC3_pushed = 2
     #define ENC_TIMER_ON ENC_STATUS,T_ON
 
+    #define DEBUG_LED LATA,1
+debug_led macro an_aus
+	banksel  LATA
+	if an_aus == 1
+	    bsf  DEBUG_LED
+	else
+	    bcf  DEBUG_LED
+	endif
+	endm
+
+debug_led_toggle macro
+	banksel  LATA
+	movlw    B'10'
+	xorwf    LATA,f
+	endm
 
 ENC	udata  0x0A0 ; on Bank 1
 ENC_STATUS res 1; Status-Byte of Encoders
@@ -41,11 +56,14 @@ P3 equ 2
 T_ON equ 3
 
 enc_int	macro num_enc ; num_enc specifies encoder
+	
+	
 	banksel IOCBF
 	bcf     IOCBF, ENC#v(num_enc)_BF    ;clear flag
 	banksel ENC#v(num_enc)_R_PORT
-	btfsc ENC#v(num_enc)_R_PORT,ENC#v(num_enc)_BF ;check if pushed or released
-        goto  enc#v(num_enc)_push   ;
+	btfss ENC#v(num_enc)_R_PORT,ENC#v(num_enc)_BF ;check if pushed or released
+        goto  enc#v(num_enc)_push   ; has been pushed, active low!!
+	
 	banksel ENC_STATUS
 	btfss ENC_STATUS,ENC#v(num_enc)_pushed ; released, check if pushed
 	return                      ; if not, do nothing
@@ -56,6 +74,7 @@ enc_int	macro num_enc ; num_enc specifies encoder
 	endm
 		
 enc_push macro num_enc  ; ENC bank is already selected
+	banksel ENC_STATUS
 	btfsc ENC_STATUS,ENC#v(num_enc)_pushed ; check if already pushed
 	return                      ; if so, do nothing
 	bsf   ENC_STATUS,ENC#v(num_enc)_pushed ; else, set pushed flag
