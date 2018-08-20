@@ -13,6 +13,7 @@
 test_p0 set 0
 test_p1 set 0
 test_p2 set 0
+test_p3 set 0
 debug_0 set 1
     
     #include <P16F1827.inc>
@@ -122,7 +123,16 @@ debug_led_toggle macro
 	movlw    B'10'
 	xorwf    LATA,f
 	endm
-
+	
+compare macro   REG,value
+	movf    REG,w
+	banksel LATA
+	xorlw   value
+	btfsc   STATUS,Z
+	bsf     DEBUG_LED
+	banksel REG
+	endm
+	
 ;*****************************************
 ; Memory
 LED	udata   0x0020
@@ -139,6 +149,7 @@ BARGB0	res     1
 RGB_p	res     1
 RGB_q	res     1
 RGB_t	res     1
+TEST	res	1 ; debug
  
 
 ;*****************************************
@@ -154,17 +165,27 @@ int	code 	04  ;Interrupt-Vector
 	call    tmr4_int
 	retfie
 	
-get_rot andlw  0x07
+get_rot 
+	if test_p3
+	banksel TEST
+	movwf   TEST
+	
+	compare TEST,0
+	
+	movf    TEST,w
+	endif
+	
+	andlw   0x07
 	brw
-	dt	VAL,RGB_q,RGB_p,RGB_p,RGB_t,VAL,0,0
+	dt	low VAL,low RGB_q,low RGB_p,low RGB_p,low RGB_t,low VAL,0,0
 
 get_gruen andlw  0x07 
 	brw
-	dt	RGB_t,VAL,VAL,RGB_q,RGB_p,RGB_p,0,0
+	dt	low RGB_t,low VAL,low VAL,low RGB_q,low RGB_p,low RGB_p,0,0
 
 get_blau andlw  0x07
 	brw
-	dt	RGB_p,RGB_p,RGB_t,VAL,VAL,RGB_q,0,0
+	dt	low RGB_p,low RGB_p,low RGB_t,low VAL,low VAL,low RGB_q,0,0
 	
 
 enc1_right
@@ -360,14 +381,17 @@ wei0    nop
 wei2    nop
 	endif
 	
+	
 	pagesel get_rot
 	movf    HUE_HIGH,w
 	call    get_rot
-	movwf   FSR0L	
+	movwf   FSR0L
 	movlw   high RGB_p
 	movwf   FSR0H
 	movf    INDF0,w
 	movwf   ROT
+	
+	;compare ROT,.128
 	
 	pagesel get_gruen
 	movf    HUE_HIGH,w
@@ -386,7 +410,7 @@ wei2    nop
 	movwf   FSR0H
 	movf    INDF0,w
 	movwf   BLAU
-	
+		
 	if test_p1
 	pagesel wei1
 	comf    BLAU,f
@@ -397,10 +421,12 @@ wei2    nop
 wei1    nop
 	endif
 	
+	banksel ROT
 	movf    ROT,w
 	banksel CCPR3L
 	movwf   CCPR3L
 	
+	banksel GRUEN
 	movf    GRUEN,w
 	banksel CCPR4L
 	movwf   CCPR4L
@@ -410,6 +436,7 @@ wei1    nop
 	banksel CCPR2L
 	movwf   CCPR2L
     else
+	banksel BLAU
 	movf    BLAU,w
 	banksel CCPR2L
 	movwf   CCPR2L
@@ -445,7 +472,6 @@ init    load_reg OSCCON, OSCCON_init
 	
 	call	compute_rgb ;init rgb
 	
-	;debug_led 1
 	load_reg CCPTMRS, CCPTMRS_init
 	load_reg ENC_STATUS,ENC_STATUS_init
 	    
