@@ -8,7 +8,7 @@
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
 
     global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
-    extern ioc_int, tmr4_int, ENC_STATUS, st_push, st_init, store_values
+    extern ioc_int, tmr4_int, ENC_STATUS, st_push, st_init, store_values, load_values
 
 test_p0 set 0
 test_p1 set 0
@@ -208,8 +208,14 @@ int	code 	04  ;Interrupt-Vector
 	btfss   INTCON,TMR0IF
 	retfie
 	bcf     INTCON,TMR0IE ; no more interrupts
+	
+	debug_led 1
+	
 	pagesel store_values
 	call    store_values
+	
+	debug_led 0
+	
 	retfie
 	
 	
@@ -557,10 +563,11 @@ init    load_reg OSCCON, OSCCON_init
 	;load_reg ROT, ROT_init
 	;load_reg GRUEN, GRUEN_init
 	;load_reg BLAU, BLAU_init
-	load_reg HUE_LOW,HUE_LOW_init
-	load_reg HUE_HIGH,HUE_HIGH_init
-	load_reg VAL,VAL_init
-	load_reg SAT,SAT_init
+	
+	;load_reg HUE_LOW,HUE_LOW_init
+	;load_reg HUE_HIGH,HUE_HIGH_init
+	;load_reg VAL,VAL_init
+	;load_reg SAT,SAT_init
 	
 	load_reg CCPTMRS, CCPTMRS_init
 	load_reg ENC_STATUS,ENC_STATUS_init
@@ -588,6 +595,12 @@ init    load_reg OSCCON, OSCCON_init
 	banksel  TRIS_BLAU
 	bcf	 TRIS_BIT_BLAU
 	
+	pagesel  st_init
+	call     st_init
+	pagesel  load_values
+	call     load_values
+	
+	pagesel  compute_rgb
 	call     compute_rgb ;init rgb
 	
 	
@@ -609,14 +622,12 @@ init    load_reg OSCCON, OSCCON_init
 	compare  AARGB1,.000
 	goto     $
  endif
-	pagesel  st_init
-	call     st_init
  
 	pagesel  start
 	goto	 start
 	
 eeprom  code     0xF000
-	de       0,0,0
+	de       HUE_LOW_init,HUE_HIGH_init,SAT_init,VAL_init
 ;**********************************************************************************************	
 	end
 
