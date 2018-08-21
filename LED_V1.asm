@@ -85,18 +85,18 @@ ENC_STATUS_init equ 0
 ;**********************************************************
 HUE_LOW_MIN equ 0x00
 HUE_LOW_MAX equ 0x7F
-HUE_LOW_INC equ 0x08
-HUE_LOW_DEC equ 0x08
+HUE_LOW_INC equ 0x04
+HUE_LOW_DEC equ 0x04
 HUE_HIGH_MIN equ 0x00
 HUE_HIGH_MAX equ 0x05
 VAL_MIN equ 0x00
 VAL_MAX equ 0x80
-VAL_INC equ 0x08
-VAL_DEC equ 0x08
+VAL_INC equ 0x04
+VAL_DEC equ 0x04
 SAT_MIN equ 0x00
 SAT_MAX equ 0x80
-SAT_INC equ 0x08
-SAT_DEC equ 0x08
+SAT_INC equ 0x04
+SAT_DEC equ 0x04
 ONE_EQ  equ .128
 
 ;**********************************************************
