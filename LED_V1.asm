@@ -8,7 +8,7 @@
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
 
     global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
-    extern ioc_int, tmr4_int, ENC_STATUS, st_push, st_init, store_values, load_values
+    extern ioc_int, tmr4_int, ENC_STATUS, st_init, store_values, load_values, FLAGS
 
 test_p0 set 0
 test_p1 set 0
@@ -136,9 +136,8 @@ compare macro   REG,value
 	endm
 	
 val_change macro num_val ; number of the value
-	movlw  num_val
-	pagesel st_push
-	call   st_push
+	banksel FLAGS
+	bsf    FLAGS,num_val
 	banksel TMR0
 	clrf  TMR0
 	bcf   INTCON,TMR0IF
