@@ -15,7 +15,8 @@ test_p1 set 0
 test_p2 set 0
 test_p3 set 0
 test_p4 set 0
-debug_0 set 1
+debug_0 set 0
+only_val set 0
     
     #include <P16F1827.inc>
     list p = 16f1827
@@ -58,9 +59,9 @@ TRISB_init equ B'11011111'
 WPUB_init  equ 0xFF
 IOCBP_init equ B'11001000' ; both edges activated
 IOCBN_init equ B'11001000'
-ROT_init    equ 0x80
+ROT_init    equ 0x00
 GRUEN_init  equ	0x00
-BLAU_init   equ 0x40
+BLAU_init   equ 0x00
 CCPTMRS_init equ B'00000000'
 PR2_PWM_init equ .128         ; Timer 2 ist PWM-Timer
 CCP2CON_init equ B'00001100'
@@ -72,11 +73,11 @@ T2CON_init equ B'00000100'
 T4CON_init equ B'00000001' ;Prescaler 4
 PR4_init equ .64
 INTCON_init equ B'00001000' ;Enable IOC
+IOCBF_init equ 0x00
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
-ENC_EN_init equ 0xFF
 HUE_LOW_init equ 00
-HUE_HIGH_init equ 04
-VAL_init equ .128
+HUE_HIGH_init equ 00
+VAL_init equ .32
 SAT_init equ .128
  
 ENC_STATUS_init equ 0
@@ -270,6 +271,9 @@ enc1_left
 
 
 enc2_right
+	if only_val
+	    return
+	endif
 	;debug_led 0
 	banksel SAT
 	movlw   SAT_INC
@@ -286,6 +290,9 @@ enc2_right
 	return
 	
 enc2_left
+	if only_val
+	    return
+	endif
 	;debug_led 0
 	banksel SAT
 	movlw   SAT_DEC
@@ -303,7 +310,10 @@ enc2_left
 	return
 
 enc3_right
-	;debug_led 1
+	if only_val
+	    return
+	endif
+	debug_led 1
 	banksel HUE_LOW
 	movlw   HUE_LOW_INC
 	addwf   HUE_LOW,f
@@ -317,7 +327,10 @@ enc3_right
 	return
 	
 enc3_left
-	;debug_led 1
+	if only_val
+	    return
+	endif
+	debug_led 0
 	banksel HUE_LOW
 	movlw   HUE_LOW_DEC
 	subwf   HUE_LOW,f
@@ -518,8 +531,6 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg VAL,VAL_init
 	load_reg SAT,SAT_init
 	
-	call	compute_rgb ;init rgb
-	
 	load_reg CCPTMRS, CCPTMRS_init
 	load_reg ENC_STATUS,ENC_STATUS_init
 	    
@@ -528,10 +539,6 @@ init    load_reg OSCCON, OSCCON_init
 	bsf	 TRIS_BIT_ROT
 	load_reg PR2, PR2_PWM_init
 	load_reg CCP3CON, CCP3CON_init
-	banksel  ROT
-   	movf	 ROT,w
-	banksel  CCPR3L
-	movwf    CCPR3L
 	load_reg T2CON, T2CON_init
 	banksel  TRIS_ROT
 	bcf	 TRIS_BIT_ROT
@@ -539,10 +546,6 @@ init    load_reg OSCCON, OSCCON_init
 	banksel  TRIS_GRUEN
 	bsf	 TRIS_BIT_GRUEN
 	load_reg CCP4CON, CCP4CON_init
-	banksel  GRUEN
-   	movf	 GRUEN,w
-	banksel  CCPR4L
-	movwf    CCPR4L
 	banksel  TRIS_GRUEN
 	bcf	 TRIS_BIT_GRUEN
 	
@@ -551,13 +554,13 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg PSTR2CON,PSTR2CON_init
 	load_reg APFCON0,APFCON0_init
 	load_reg CCP2CON, CCP2CON_init
-	banksel  BLAU
-   	movf	 BLAU,w
-	banksel  CCPR2L
-	movwf    CCPR2L
 	banksel  TRIS_BLAU
 	bcf	 TRIS_BIT_BLAU
 	
+	call     compute_rgb ;init rgb
+	
+	
+	load_reg IOCBF,IOCBF_init
 	load_reg INTCON,INTCON_init
 	load_reg T4CON,T4CON_init
 	load_reg PR4,PR4_init
