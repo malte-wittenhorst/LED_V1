@@ -8,7 +8,7 @@
 ; Buchse: Oben +12V, RA7 (CCP2,blau), RA3 (CCP3,rot), RA4 (CCP4,gruen)
 
     global enc1_left, enc2_left, enc3_left, enc1_right, enc2_right, enc3_right
-    extern ioc_int, tmr4_int, ENC_STATUS
+    extern ioc_int, tmr4_int, ENC_STATUS, st_push, st_init, store_values
 
 test_p0 set 0
 test_p1 set 0
@@ -52,8 +52,8 @@ TRIS_BLAU  equ TRISA
     #define TRIS_BIT_GRUEN TRISA,4
     #define TRIS_BIT_BLAU TRISA,7
 
-OSCCON_init equ B'00111010'  ; 500 kHz internal oscillator
-OPTION_REG_init equ B'00001000'
+OSCCON_init equ B'00111010'  ; 500 kHz internal oscillator, 8 us cycle
+OPTION_REG_init equ B'00000111' ; Timer0 uses prescaler 1:256
 TRISA_init equ B'00100000'
 TRISB_init equ B'11011111'
 WPUB_init  equ 0xFF
@@ -135,6 +135,15 @@ compare macro   REG,value
 	banksel REG
 	endm
 	
+val_change macro num_val ; number of the value
+	movlw  num_val
+	pagesel st_push
+	call   st_push
+	banksel TMR0
+	clrf  TMR0
+	bcf   INTCON,TMR0IF
+	bsf   INTCON,TMR0IE
+	endm
 	
 ;**********************************************************************************************
 UMUL0808 macro
@@ -183,6 +192,7 @@ RGB_q	res     1
 RGB_t	res     1
 TEST	res	1 ; debug
  
+    global HUE_LOW, HUE_HIGH, SAT, VAL
 
 ;*****************************************
 reset_vec code	00  ;Programmstart
@@ -195,7 +205,13 @@ int	code 	04  ;Interrupt-Vector
 	banksel PIR3
 	btfsc   PIR3,TMR4IF
 	call    tmr4_int
+	btfss   INTCON,TMR0IF
 	retfie
+	bcf     INTCON,TMR0IE ; no more interrupts
+	pagesel store_values
+	call    store_values
+	retfie
+	
 	
 get_rot 
 	if test_p3
@@ -247,6 +263,8 @@ enc1_right
 	btfss   STATUS,C ; Wenn carry bit 0, dann W > k, also Val größer val_max
 	movwf   VAL      ; wird übersprungen, wenn carry bit 1 ist
 	
+	val_change 3 ; 3 is for VAL
+	
 	pagesel compute_rgb
 	call	compute_rgb
 	return
@@ -265,6 +283,8 @@ enc1_left
 	btfsc   STATUS,C
 	movwf   VAL       ; Carry ist eins, also val kleiner gleich val_min
 
+	val_change 3
+	
 	pagesel compute_rgb
 	call    compute_rgb
 	return
@@ -284,6 +304,7 @@ enc2_right
 	btfss   STATUS,C ; Wenn carry bit 0, dann W > k, also Val größer val_max
 	movwf   SAT      ; wird übersprungen, wenn carry bit 1 ist
 	
+	val_change 2
 	
 	pagesel compute_rgb
 	call    compute_rgb
@@ -305,6 +326,8 @@ enc2_left
 	btfsc   STATUS,C
 	movwf   SAT       ; Carry ist eins, also val kleiner gleich val_min
 	
+	val_change 2
+	
 	pagesel compute_rgb
 	call    compute_rgb	
 	return
@@ -322,6 +345,8 @@ enc3_right
 	btfss   STATUS,C    ; wenn C = 1, dann kein Übertrag
 	call    inc_hue
 	
+	val_change 0
+	
 	pagesel compute_rgb
 	call    compute_rgb	
 	return
@@ -337,6 +362,8 @@ enc3_left
 	btfss   STATUS,C
 	call    dec_hue
 
+	val_change 0
+	
 	pagesel compute_rgb
 	call    compute_rgb
 	return
@@ -349,6 +376,8 @@ inc_hue
 	sublw   HUE_HIGH_MAX ; c=0 wenn max kleiner als hue_high
 	btfss   STATUS,C
 	clrf    HUE_HIGH
+	
+	val_change 1
 	return
 
 dec_hue
@@ -361,6 +390,8 @@ dec_hue
 	return
 	movlw   HUE_HIGH_MAX
 	movwf   HUE_HIGH
+	
+	val_change 1
 	return
 
 compute_rgb
@@ -578,9 +609,14 @@ init    load_reg OSCCON, OSCCON_init
 	compare  AARGB1,.000
 	goto     $
  endif
-	
+	pagesel  st_init
+	call     st_init
+ 
 	pagesel  start
 	goto	 start
+	
+eeprom  code     0xF000
+	de       0,0,0
 ;**********************************************************************************************	
 	end
 
