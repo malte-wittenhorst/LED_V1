@@ -14,6 +14,7 @@ test_p0 set 0
 test_p1 set 0
 test_p2 set 0
 test_p3 set 0
+test_p4 set 0
 debug_0 set 1
     
     #include <P16F1827.inc>
@@ -74,7 +75,7 @@ INTCON_init equ B'00001000' ;Enable IOC
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
 ENC_EN_init equ 0xFF
 HUE_LOW_init equ 00
-HUE_HIGH_init equ 00
+HUE_HIGH_init equ 04
 VAL_init equ .128
 SAT_init equ .128
  
@@ -133,6 +134,36 @@ compare macro   REG,value
 	banksel REG
 	endm
 	
+	
+;**********************************************************************************************
+UMUL0808 macro
+; Max Timing: 2+5+7*4 = 35 clks
+; Min Timing: 2+16+3 = 21 clks
+; PM: 2+2*8+4+7*4 = 50 DM: 3
+ variable i = 0
+     BCF STATUS,C ; clear carry for first right shift
+    MOVF AARGB0,W
+
+ while i < 8
+
+    BTFSC BARGB0,i
+    GOTO UM0808NA#v(i)
+    variable i = i + 1
+ endw
+    CLRF AARGB0 ; if we get here, BARG = 0
+    RETURN
+UM0808NA0 RRF AARGB0, F
+    RRF AARGB1, F
+    variable i = 1
+ while i < 8
+    BTFSC BARGB0,i
+    ADDWF AARGB0, F
+UM0808NA#v(i) RRF AARGB0, F
+     RRF AARGB1, F
+    variable i = i + 1
+ endw
+     endm
+;**********************************************************************************************
 ;*****************************************
 ; Memory
 LED	udata   0x0020
@@ -187,9 +218,24 @@ get_blau andlw  0x07
 	brw
 	dt	low RGB_p,low RGB_p,low RGB_t,low VAL,low VAL,low RGB_q,0,0
 	
+; 8x8 Bit Unsigned Fixed Point Multiply 8x8 -> 16
+; Input: 8 bit unsigned fixed point multiplicand in AARGB0
+; 8 bit unsigned fixed point multiplier in BARGB0
+; Use: CALL FXM0808U
+; Output: 8 bit unsigned fixed point product in AARGB0
+; Result: AARG <-- AARG x BARG
+; Max Timing: 1+70+2 = 73 clks
+; Min Timing: 1+53 = 54 clks
+; PM: 1+19+1 = 21 DM: 4
+FXM0808U
+        banksel  AARGB1
+        CLRF AARGB1 ; clear partial product
+	UMUL0808
+	RETLW 0x00
+;**********************************************************************************************
 
 enc1_right
-	debug_led 1
+	;debug_led 1
 	
 	banksel VAL
 	movlw   VAL_INC
@@ -205,7 +251,7 @@ enc1_right
 	return
 	
 enc1_left
-	debug_led 0
+	;debug_led 0
 	
 	banksel VAL
 	movlw   VAL_DEC
@@ -224,6 +270,7 @@ enc1_left
 
 
 enc2_right
+	;debug_led 0
 	banksel SAT
 	movlw   SAT_INC
 	addwf   SAT,f
@@ -239,6 +286,7 @@ enc2_right
 	return
 	
 enc2_left
+	;debug_led 0
 	banksel SAT
 	movlw   SAT_DEC
 	subwf   SAT,f
@@ -269,7 +317,7 @@ enc3_right
 	return
 	
 enc3_left
-	;debug_led 0
+	;debug_led 1
 	banksel HUE_LOW
 	movlw   HUE_LOW_DEC
 	subwf   HUE_LOW,f
@@ -317,8 +365,8 @@ compute_rgb
 	movwf   BARGB0
 	call    FXM0808U
 	banksel AARGB1
-	rlf     AARGB0,f
-	rlf     AARGB1,w ; Shift am Ende der Multiplikation
+	rlf     AARGB1,f
+	rlf     AARGB0,w ; Shift am Ende der Multiplikation
 	banksel RGB_p
 	movwf   RGB_p
 	
@@ -337,39 +385,39 @@ wei0    nop
 	movf    HUE_LOW,w ; HUE_LOW ist f
 	movwf   BARGB0
 	call    FXM0808U
-	rlf     AARGB0,f
 	rlf     AARGB1,f
+	rlf     AARGB0,f  ; S*f ist in AARGB0
 	movlw   ONE_EQ
-	movwf   AARGB0
-	movf    AARGB1,w
-	subwf   AARGB0,f  ; 1-S*f
+	movwf   BARGB0
+	movf    AARGB0,w
+	subwf   BARGB0,f  ; 1-S*f ist in BARGB0
 	
 	movf    VAL,w
-	movwf   BARGB0
+	movwf   AARGB0 ; V ist in AARGB0
 	call    FXM0808U
-	rlf     AARGB0,f
-	rlf     AARGB1,w ; Shift am Ende der Multiplikation
+	rlf     AARGB1,f
+	rlf     AARGB0,w ; Shift am Ende der Multiplikation
 	movwf   RGB_q
 	
 	movlw   HUE_LOW_MAX    ;t = V*(1-S*(1-f))
 	movwf   AARGB0
 	movf    HUE_LOW,w
-	subwf   AARGB0,f  ; 1-f ist geladen
+	subwf   AARGB0,f  ; 1-f ist geladen in AARGB0
 	movf    SAT,w     ; SAT laden
 	movwf   BARGB0
 	call    FXM0808U
-	rlf     AARGB0,f
 	rlf     AARGB1,f
-	movlw   ONE_EQ
-	movwf   AARGB0
-	movf    AARGB1,w
-	subwf   AARGB0,f ; (1-S*(1-f)) ist geladen
-	movf    VAL,w    ; VAL laden
-	movwf   BARGB0
-	call    FXM0808U
 	rlf     AARGB0,f
-	rlf     AARGB1,w
-	movwf   RGB_t
+	movlw   ONE_EQ
+	movwf   BARGB0
+	movf    AARGB0,w
+	subwf   BARGB0,f ; (1-S*(1-f)) ist geladen in BARGB0
+	movf    VAL,w    ; VAL laden
+	movwf   AARGB0   ; in AARGB0
+	call    FXM0808U
+	rlf     AARGB1,f
+	rlf     AARGB0,w
+	movwf   RGB_t    ; t wurde berenchnet
 	
 	if test_p2
 	pagesel wei2
@@ -445,7 +493,7 @@ wei1    nop
 	return
 	
 	
-	
+;*****************************************************
 start	bsf     INTCON,PEIE
 	bsf	INTCON,GIE
 loop	goto	loop ; Endlosschleife	
@@ -498,16 +546,6 @@ init    load_reg OSCCON, OSCCON_init
 	banksel  TRIS_GRUEN
 	bcf	 TRIS_BIT_GRUEN
 	
-	banksel  TRIS_GRUEN
-	bsf	 TRIS_BIT_GRUEN
-	load_reg CCP4CON, CCP4CON_init
-	banksel  GRUEN
-   	movf	 GRUEN,w
-	banksel  CCPR4L
-	movwf    CCPR4L
-	banksel  TRIS_GRUEN
-	bcf	 TRIS_BIT_GRUEN
-	
 	banksel  TRIS_BLAU
 	bsf	 TRIS_BIT_BLAU
 	load_reg PSTR2CON,PSTR2CON_init
@@ -525,55 +563,21 @@ init    load_reg OSCCON, OSCCON_init
 	load_reg PR4,PR4_init
 	load_reg PIE3,PIE3_init
 	
+ if test_p4
+	banksel  AARGB0
+	movlw    .128
+	movwf    AARGB0
+	movwf    BARGB0
+	call     FXM0808U
+	bcf      STATUS,C
+	rlf      AARGB1,f	
+	rlf      AARGB0,f
+	compare  AARGB1,.000
+	goto     $
+ endif
+	
 	pagesel  start
 	goto	 start
-;*****************************************	
-	
-;**********************************************************************************************
-UMUL0808 macro
-; Max Timing: 2+5+7*4 = 35 clks
-; Min Timing: 2+16+3 = 21 clks
-; PM: 2+2*8+4+7*4 = 50 DM: 3
- variable i = 0
-     BCF STATUS,C ; clear carry for first right shift
-    MOVF AARGB0,W
-
- while i < 8
-
-    BTFSC BARGB0,i
-    GOTO UM0808NA#v(i)
-    variable i = i + 1
- endw
-    CLRF AARGB0 ; if we get here, BARG = 0
-    RETURN
-UM0808NA0 RRF AARGB0, F
-    RRF AARGB1, F
-    variable i = 1
- while i < 8
-    BTFSC BARGB0,i
-    ADDWF AARGB0, F
-UM0808NA#v(i) RRF AARGB0, F
-     RRF AARGB1, F
-    variable i = i + 1
- endw
-     endm
-;**********************************************************************************************
-
-; 8x8 Bit Unsigned Fixed Point Multiply 8x8 -> 16
-; Input: 8 bit unsigned fixed point multiplicand in AARGB0
-; 8 bit unsigned fixed point multiplier in BARGB0
-; Use: CALL FXM0808U
-; Output: 8 bit unsigned fixed point product in AARGB0
-; Result: AARG <-- AARG x BARG
-; Max Timing: 1+70+2 = 73 clks
-; Min Timing: 1+53 = 54 clks
-; PM: 1+19+1 = 21 DM: 4
-FXM0808U
-        banksel  AARGB1
-        CLRF AARGB1 ; clear partial product
-	UMUL0808
-	RETLW 0x00
-;**********************************************************************************************
 ;**********************************************************************************************	
 	end
 

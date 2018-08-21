@@ -8,7 +8,7 @@
     #include <P16F1827.inc>
     list p = 16f1827
     processor 16f1827
-    variable i ; counter
+    variable j ; counter
 
 ENC1_R_PORT equ PORTB
 ENC2_R_PORT equ PORTB
@@ -19,9 +19,9 @@ ENC3_L_PORT equ PORTA
     constant ENC1_L = RB1
     constant ENC2_L = RB4
     constant ENC3_L = RA5
-    constant ENC1_R = PORTB;,RB3
-    constant ENC2_R = PORTB;,RB6
-    constant ENC3_R = PORTB;,RB7
+    ;constant ENC1_R = PORTB;,RB3
+    ;constant ENC2_R = PORTB;,RB6
+    ;constant ENC3_R = PORTB;,RB7
     constant ENC1_BF = 3
     constant ENC2_BF = 6
     constant ENC3_BF = 7
@@ -101,11 +101,11 @@ ioc_int         		; INTCON is Core
 	call    enc3_int
 	return
 
-i = 0
-    while i<3
-i += 1
-enc#v(i)_int enc_int i
-enc#v(i)_push enc_push i
+j = 0
+    while j<3
+j += 1
+enc#v(j)_int enc_int j
+enc#v(j)_push enc_push j
     endw
 
 debounce_timer_start ;start timer 4
