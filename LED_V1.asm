@@ -15,6 +15,7 @@ test_p1 set 0
 test_p2 set 0
 test_p3 set 0
 test_p4 set 0
+test_init set 0
 debug_0 set 0
 only_val set 0
     
@@ -77,15 +78,16 @@ IOCBF_init equ 0x00
 PIE3_init equ B'00000010' ;Enable TMR4 Interrupt
 HUE_LOW_init equ 00
 HUE_HIGH_init equ 00
-VAL_init equ .32
+VAL_init equ .64
 SAT_init equ .128
  
 ENC_STATUS_init equ 0
 
 ;**********************************************************
+constant HUE_LOW_INC = .4 
 HUE_LOW_MIN equ 0x00
-HUE_LOW_MAX equ 0x7F
-HUE_LOW_INC equ 0x04
+HUE_LOW_MAX equ .128-HUE_LOW_INC
+;HUE_LOW_INC equ 0x04
 HUE_LOW_DEC equ 0x04
 HUE_HIGH_MIN equ 0x00
 HUE_HIGH_MAX equ 0x05
@@ -127,6 +129,7 @@ debug_led_toggle macro
 	endm
 	
 compare macro   REG,value
+	banksel REG
 	movf    REG,w
 	banksel LATA
 	xorlw   value
@@ -207,13 +210,9 @@ int	code 	04  ;Interrupt-Vector
 	btfss   INTCON,TMR0IF
 	retfie
 	bcf     INTCON,TMR0IE ; no more interrupts
-	
-	debug_led 1
-	
+		
 	pagesel store_values
 	call    store_values
-	
-	debug_led 0
 	
 	retfie
 	
@@ -269,6 +268,8 @@ enc1_right
 	movwf   VAL      ; wird übersprungen, wenn carry bit 1 ist
 	
 	val_change 3 ; 3 is for VAL
+	;debug_led 0
+	;compare VAL,.128
 	
 	pagesel compute_rgb
 	call	compute_rgb
@@ -341,7 +342,7 @@ enc3_right
 	if only_val
 	    return
 	endif
-	debug_led 1
+	;debug_led 1
 	banksel HUE_LOW
 	movlw   HUE_LOW_INC
 	addwf   HUE_LOW,f
@@ -360,7 +361,7 @@ enc3_left
 	if only_val
 	    return
 	endif
-	debug_led 0
+	;debug_led 0
 	banksel HUE_LOW
 	movlw   HUE_LOW_DEC
 	subwf   HUE_LOW,f
@@ -448,7 +449,7 @@ wei0    nop
 	rlf     AARGB0,w ; Shift am Ende der Multiplikation
 	movwf   RGB_q
 	
-	movlw   HUE_LOW_MAX    ;t = V*(1-S*(1-f))
+	movlw   ONE_EQ    ;t = V*(1-S*(1-f))
 	movwf   AARGB0
 	movf    HUE_LOW,w
 	subwf   AARGB0,f  ; 1-f ist geladen in AARGB0
@@ -543,7 +544,11 @@ wei1    nop
 	
 	
 ;*****************************************************
-start	bsf     INTCON,PEIE
+start	
+	if test_init
+	goto $
+	endif
+	bsf     INTCON,PEIE
 	bsf	INTCON,GIE
 loop	goto	loop ; Endlosschleife	
 
@@ -599,6 +604,16 @@ init    load_reg OSCCON, OSCCON_init
 	pagesel  load_values
 	call     load_values
 	
+	banksel  VAL
+	movf     VAL,w
+	xorlw    0xFF
+	btfss    STATUS,Z
+	bra      cor_data ; data is correct, workaround
+	load_reg VAL,VAL_init
+	load_reg SAT,SAT_init
+	clrf     HUE_LOW
+	clrf     HUE_HIGH
+cor_data
 	pagesel  compute_rgb
 	call     compute_rgb ;init rgb
 	
